@@ -1,0 +1,23 @@
+# Compiled binaries and build outputs
+bin/
+
+# Local databases and dynamic user uploads
+data/
+*.db
+
+# Private environment configuration
+.env
+
+# IDE and OS files
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+.DS_Store
+
+# Temporary files and folders
+tmp/
+
+# Agent files
+GEMINI.md

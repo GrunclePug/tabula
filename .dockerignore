@@ -1,0 +1,6 @@
+bin/
+data/
+tailwindcss
+tabula.db
+.env
+.git/

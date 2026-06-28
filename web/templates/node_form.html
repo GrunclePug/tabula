@@ -1,0 +1,195 @@
+{{define "node_form"}}
+<div id="node-form-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm" style="animation: modalFadeIn 0.2s ease-out;">
+    <form {{if .ID}}hx-put="/nodes/{{.ID}}" hx-target="#node-{{.ID}}" hx-swap="outerHTML"{{else}}hx-post="/nodes" hx-target="#nodes-container-{{.GroupID}}" hx-swap="beforeend"{{end}}
+          class="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4 relative">
+        
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center pb-3 border-b border-zinc-800 shrink-0">
+            <h2 class="text-sm font-bold text-zinc-200 uppercase tracking-wider">{{if .ID}}Edit Service Node{{else}}Add Service Node{{end}}</h2>
+            <button type="button" onclick="document.getElementById('node-form-modal').remove()" class="text-zinc-500 hover:text-white transition-colors bg-zinc-800 hover:bg-zinc-700 p-1.5 rounded-md">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <input type="hidden" name="group_id" value="{{.GroupID}}">
+
+        <!-- Input Fields -->
+        <div class="flex flex-col gap-3.5 max-h-[65vh] overflow-y-auto pr-1">
+            <!-- Name -->
+            <div>
+                <label class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider block mb-1">Name</label>
+                <input type="text" name="name" value="{{.Name}}" required placeholder="e.g., Overseerr" 
+                       class="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded px-3 py-2 text-sm focus:outline-none text-zinc-200">
+            </div>
+
+            <!-- URL -->
+            <div>
+                <label class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider block mb-1">Service URL</label>
+                <input type="text" name="service_url" value="{{.ServiceURL}}" required placeholder="https://..." 
+                       class="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded px-3 py-2 text-sm focus:outline-none text-zinc-200">
+            </div>
+
+            <!-- Description -->
+            <div>
+                <label class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider block mb-1">Description</label>
+                <input type="text" name="description" value="{{.Description}}" placeholder="e.g., Media Requester" 
+                       class="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded px-3 py-2 text-sm focus:outline-none text-zinc-200">
+            </div>
+
+            <!-- Repo URL -->
+            <div>
+                <label class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider block mb-1">Repo URL (optional)</label>
+                <input type="text" name="repo_url" value="{{.RepoURL}}" placeholder="e.g., https://github.com/..." 
+                       class="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded px-3 py-2 text-sm focus:outline-none text-zinc-200">
+            </div>
+
+            <!-- Docs Path & Autocomplete -->
+            <div class="relative">
+                <label class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider block mb-1">Docs Path (relative to Vault)</label>
+                <input type="text" id="docs-input-{{.ID}}" name="docs_path" value="{{.DocsPath}}" placeholder="e.g., docs/plex.md" 
+                       hx-get="/docs/autocomplete" hx-trigger="keyup changed delay:200ms" hx-target="#autocomplete-results-{{.ID}}" 
+                       class="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded px-3 py-2 text-sm focus:outline-none text-zinc-200"
+                       autocomplete="off">
+                <ul id="autocomplete-results-{{.ID}}" class="absolute z-30 left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-zinc-900 border border-zinc-800 rounded shadow-2xl hidden empty:hidden"></ul>
+            </div>
+
+            <!-- Icon Upload/Paste Ingestion -->
+            <div>
+                <label class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider block mb-1">Icon Source</label>
+                <div class="flex flex-col gap-2">
+                    <input type="text" id="icon-src-{{.ID}}" name="icon_source" value="{{.IconSource}}" placeholder="Icon URL or uploaded image path" 
+                           class="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded px-3 py-2 text-sm focus:outline-none text-zinc-200">
+                    
+                    <div class="flex gap-2">
+                        <input type="file" class="hidden file-upload-input" accept="image/*" onchange="uploadIconFile(this)">
+                        <button type="button" onclick="this.closest('div').querySelector('.file-upload-input').click()" 
+                                class="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 rounded-md transition-colors border border-zinc-800 hover:border-zinc-700">
+                            Upload File
+                        </button>
+                        <button type="button" onclick="pasteIconFromClipboard(this)" 
+                                class="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 rounded-md transition-colors border border-zinc-800 hover:border-zinc-700">
+                            Paste Clipboard
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Health Check -->
+            <div class="flex items-center gap-2.5 mt-1">
+                <input type="checkbox" name="health_check" value="true" id="hc-{{.ID}}" {{if .HealthCheck}}checked{{end}} 
+                       class="rounded bg-zinc-950 border-zinc-800 text-indigo-600 focus:ring-indigo-500">
+                <label for="hc-{{.ID}}" class="text-xs text-zinc-400">Enable Health Checking</label>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-end gap-3 mt-4 pt-3 border-t border-zinc-800 shrink-0">
+            <button type="button" onclick="document.getElementById('node-form-modal').remove()" 
+                    class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs rounded-md text-zinc-300 transition-colors">Cancel</button>
+            <button type="submit" 
+                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-xs rounded-md text-white font-medium shadow transition-colors">Save Details</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    {
+        const input = document.getElementById('docs-input-{{.ID}}');
+        const results = document.getElementById('autocomplete-results-{{.ID}}');
+        
+        input?.addEventListener('focus', () => {
+            if (results && results.children.length > 0) {
+                results.classList.remove('hidden');
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (results && !results.contains(e.target) && e.target !== input) {
+                results.classList.add('hidden');
+            }
+        });
+
+        window.selectDoc = function(val) {
+            if (input) {
+                input.value = val;
+                if (results) {
+                    results.classList.add('hidden');
+                    results.innerHTML = '';
+                }
+            }
+        };
+
+        window.uploadIconFile = function(inputEl) {
+            const file = inputEl.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('icon', file);
+            
+            fetch('/upload/icon', {
+                method: 'POST',
+                body: formData
+            }).then(res => res.text()).then(url => {
+                const targetInput = inputEl.closest('form').querySelector('input[name="icon_source"]');
+                if (targetInput) targetInput.value = url;
+            }).catch(err => alert('Upload failed: ' + err));
+        };
+
+        window.uploadBlob = function(blob, formEl) {
+            const formData = new FormData();
+            formData.append('icon', blob, 'clipboard.png');
+            
+            fetch('/upload/icon', {
+                method: 'POST',
+                body: formData
+            }).then(res => {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.text();
+            }).then(url => {
+                const targetInput = formEl.querySelector('input[name="icon_source"]');
+                if (targetInput) targetInput.value = url;
+            }).catch(err => alert('Clipboard upload failed: ' + err));
+        };
+
+        window.pasteIconFromClipboard = function(buttonEl) {
+            if (!navigator.clipboard || !navigator.clipboard.read) {
+                alert('Clipboard read API is not supported in this browser or context (requires localhost or HTTPS). Try focusing the input field and pressing Ctrl+V instead.');
+                return;
+            }
+            const formEl = buttonEl.closest('form');
+            navigator.clipboard.read().then(items => {
+                let found = false;
+                for (let item of items) {
+                    for (let type of item.types) {
+                        if (type.startsWith('image/')) {
+                            found = true;
+                            item.getType(type).then(blob => {
+                                window.uploadBlob(blob, formEl);
+                            });
+                            return;
+                        }
+                    }
+                }
+                if (!found) {
+                    alert('No image found on clipboard. Note: if you copied a file from your file manager, try taking a screenshot or copying the image directly from a browser instead.');
+                }
+            }).catch(err => {
+                alert('Failed to read clipboard: ' + err + '. Note: if using Firefox, async clipboard read is disabled by default.');
+            });
+        };
+
+        const localIconInput = document.getElementById('icon-src-{{.ID}}');
+        localIconInput?.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || window.clipboardData).items;
+            for (let item of items) {
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    const blob = item.getAsFile();
+                    window.uploadBlob(blob, e.target.closest('form'));
+                    e.preventDefault();
+                    break;
+                }
+            }
+        });
+    }
+</script>
+{{end}}

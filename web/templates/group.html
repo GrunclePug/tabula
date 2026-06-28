@@ -1,0 +1,68 @@
+{{define "group"}}
+<div class="group-container bg-zinc-900/90 backdrop-blur-md border border-zinc-800 rounded-lg shadow-xl flex flex-col" 
+     data-id="{{.ID}}" 
+     style="left: {{.PosX}}px; top: {{.PosY}}px; width: {{.Width}}px; height: {{.Height}}px;" 
+     id="group-{{.ID}}">
+    
+    <div class="{{if .Editable}}group-handle cursor-move bg-zinc-800/80{{else}}bg-zinc-850{{end}} p-2 border-b border-zinc-700 flex justify-between items-center rounded-t-lg">
+        {{if .Editable}}
+            {{template "group_name_span" .}}
+        {{else}}
+            <h2 class="text-sm font-semibold text-zinc-200 ml-1.5 py-0.5">{{.Name}}</h2>
+        {{end}}
+        <div class="flex gap-2 items-center">
+            <button hx-put="/groups/{{.ID}}/collapse?manage={{.Editable}}" hx-target="#group-{{.ID}}" hx-swap="outerHTML" class="text-zinc-400 hover:text-white transition-colors" title="Toggle Collapse">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            {{if .Editable}}
+            <button hx-delete="/groups/{{.ID}}" hx-target="#group-{{.ID}}" hx-swap="outerHTML" class="text-red-400 hover:text-red-300 transition-colors" title="Delete Group">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            {{end}}
+        </div>
+    </div>
+    
+    {{if not .Collapsed}}
+    <div class="flex-1 p-4 overflow-y-auto flex flex-col justify-between">
+        <!-- Scrollable Nodes Container -->
+        <div id="nodes-container-{{.ID}}" class="flex flex-wrap gap-4 content-start items-start">
+            {{range .Nodes}}
+                {{template "node" .}}
+            {{end}}
+        </div>
+        
+        {{if .Editable}}
+        <!-- Add Button (inline at bottom) -->
+        <div class="mt-4 pt-2 border-t border-zinc-800/50 shrink-0">
+            <button hx-get="/nodes/new?group_id={{.ID}}" hx-target="#modal-container" hx-swap="innerHTML" 
+                    class="w-full py-2 rounded-lg border border-dashed border-zinc-700 hover:border-zinc-500 flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30 transition-all text-xs font-semibold gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Add Service Node
+            </button>
+        </div>
+        {{end}}
+    </div>
+    {{end}}
+    
+    {{if .Editable}}
+    <div class="resizer rounded-br-lg"></div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "group_name_span"}}
+<span class="text-sm font-semibold text-zinc-200 ml-1.5 hover:bg-zinc-700/50 cursor-pointer px-1.5 py-0.5 rounded transition-all"
+      hx-get="/groups/{{.ID}}/edit-name" hx-trigger="click" hx-target="this" hx-swap="outerHTML">
+    {{.Name}}
+</span>
+{{end}}
+
+{{define "group_name_form"}}
+<form hx-put="/groups/{{.ID}}/name" hx-target="this" hx-swap="outerHTML" class="flex items-center gap-1.5 ml-1.5 py-0.5">
+    <input type="text" name="name" value="{{.Name}}" required 
+           class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500 w-32">
+    <button type="submit" class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 rounded text-white text-[10px] font-medium transition-colors">Save</button>
+    <button type="button" hx-get="/groups/{{.ID}}/name" hx-target="closest form" hx-swap="outerHTML" 
+            class="px-2 py-0.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300 text-[10px] font-medium transition-colors">Cancel</button>
+</form>
+{{end}}

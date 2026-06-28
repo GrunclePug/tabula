@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tabula</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <style>
+        .group-container { position: absolute; touch-action: none; }
+        .resizer { position: absolute; right: 0; bottom: 0; width: 15px; height: 15px; background: rgba(255,255,255,0.2); cursor: se-resize; }
+        /* Basic Markdown Prose Styling */
+        .markdown-body h1 { @apply text-3xl font-bold mb-4 text-white; }
+        .markdown-body h2 { @apply text-2xl font-bold mb-3 mt-6 text-white border-b border-zinc-700 pb-2; }
+        .markdown-body h3 { @apply text-xl font-bold mb-2 mt-4 text-zinc-100; }
+        .markdown-body p { @apply mb-4 leading-relaxed; }
+        .markdown-body a { @apply text-blue-400 hover:underline; }
+        .markdown-body code { @apply bg-zinc-800 px-1.5 py-0.5 rounded text-sm font-mono text-zinc-200; }
+        .markdown-body pre { @apply bg-zinc-950 p-4 rounded-lg overflow-x-auto mb-4 border border-zinc-800; }
+        .markdown-body pre code { @apply bg-transparent p-0; }
+        .markdown-body ul { @apply list-disc list-inside mb-4; }
+        .markdown-body ol { @apply list-decimal list-inside mb-4; }
+        .markdown-body blockquote { @apply border-l-4 border-zinc-600 pl-4 italic text-zinc-400 mb-4; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-300 font-sans h-screen flex flex-col overflow-hidden">
+    <!-- Top Bar -->
+    <header class="flex justify-between items-center bg-zinc-900 border-b border-zinc-800 p-4 shrink-0 shadow-md relative z-10">
+        <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
+            <a href="/">tabula</a>
+            <span class="text-xs text-zinc-500 ml-2">v{{.Version}}</span>
+        </h1>
+        <div class="flex gap-4 items-center">
+            {{if .Editable}}
+                <form hx-post="/groups" hx-target="#canvas" hx-swap="beforeend" class="flex gap-2">
+                    <input type="text" name="name" placeholder="New Group" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-indigo-500">
+                    <button type="submit" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-sm rounded transition-colors text-zinc-200 shadow-sm border border-zinc-700/50">Add Group</button>
+                </form>
+                <button onclick="saveLayout()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-sm rounded transition-colors text-white shadow-sm font-medium">Save Layout</button>
+                <a href="/" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-sm rounded transition-colors text-zinc-300 shadow-sm border border-zinc-700/50 font-medium">Exit Edit Mode</a>
+            {{else}}
+                <a href="/manage" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-sm rounded transition-colors text-white shadow-sm font-medium">Manage Layout</a>
+            {{end}}
+        </div>
+    </header>
+
+    <!-- Main Canvas -->
+    <main id="canvas" class="flex-1 relative overflow-auto bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:20px_20px]">
+        {{range .Groups}}
+            {{template "group" .}}
+        {{end}}
+    </main>
+
+    {{if .Editable}}
+    <script>
+        // Vanilla JS for draggable and resizable containers
+        let draggedGroup = null;
+        let resizedGroup = null;
+        let startX, startY, startW, startH, initialMouseX, initialMouseY;
+
+        document.getElementById('canvas').addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.closest('form')) {
+                return;
+            }
+
+            const resizer = e.target.closest('.resizer');
+            const handle = e.target.closest('.group-handle');
+            
+            if (resizer) {
+                resizedGroup = resizer.closest('.group-container');
+                initialMouseX = e.clientX;
+                initialMouseY = e.clientY;
+                startW = parseInt(window.getComputedStyle(resizedGroup).width, 10);
+                startH = parseInt(window.getComputedStyle(resizedGroup).height, 10);
+                e.preventDefault();
+            } else if (handle) {
+                draggedGroup = handle.closest('.group-container');
+                initialMouseX = e.clientX;
+                initialMouseY = e.clientY;
+                startX = parseInt(window.getComputedStyle(draggedGroup).left, 10) || 0;
+                startY = parseInt(window.getComputedStyle(draggedGroup).top, 10) || 0;
+                // Bring to front
+                document.querySelectorAll('.group-container').forEach(el => el.style.zIndex = 1);
+                draggedGroup.style.zIndex = 10;
+                e.preventDefault();
+            }
+        });
+
+        const GRID_SIZE = 20;
+        function snap(val) {
+            return Math.round(val / GRID_SIZE) * GRID_SIZE;
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (draggedGroup) {
+                const dx = e.clientX - initialMouseX;
+                const dy = e.clientY - initialMouseY;
+                const newX = snap(startX + dx);
+                const newY = snap(startY + dy);
+                draggedGroup.style.left = `${newX}px`;
+                draggedGroup.style.top = `${newY}px`;
+            } else if (resizedGroup) {
+                const dx = e.clientX - initialMouseX;
+                const dy = e.clientY - initialMouseY;
+                const newW = snap(startW + dx);
+                const newH = snap(startH + dy);
+                resizedGroup.style.width = `${Math.max(200, newW)}px`;
+                resizedGroup.style.height = `${Math.max(100, newH)}px`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            draggedGroup = null;
+            resizedGroup = null;
+        });
+
+        function saveLayout() {
+            const groups = Array.from(document.querySelectorAll('.group-container')).map(el => ({
+                id: parseInt(el.dataset.id),
+                pos_x: parseInt(el.style.left, 10) || 0,
+                pos_y: parseInt(el.style.top, 10) || 0,
+                width: parseInt(el.style.width, 10) || 300,
+                height: parseInt(el.style.height, 10) || 200
+            }));
+
+            fetch('/layout/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(groups)
+            }).then(res => {
+                if(res.ok) alert('Layout Saved!');
+                else alert('Failed to save layout.');
+            });
+        }
+
+        // Close node form modal when HTMX triggers closeModal event
+        document.addEventListener('closeModal', () => {
+            const modal = document.getElementById('node-form-modal');
+            if (modal) modal.remove();
+        });
+
+        // Node Drag-and-Drop / Reordering / Cross-Group Transfer
+        let draggedNode = null;
+
+        document.addEventListener('dragstart', (e) => {
+            const card = e.target.closest('.node-card');
+            if (card) {
+                draggedNode = card;
+                card.classList.add('opacity-40');
+                e.dataTransfer.setData('text/plain', card.dataset.id);
+                e.dataTransfer.effectAllowed = 'move';
+            }
+        });
+
+        document.addEventListener('dragend', (e) => {
+            if (draggedNode) {
+                draggedNode.classList.remove('opacity-40');
+                draggedNode = null;
+                saveNodeOrders();
+            }
+        });
+
+        document.addEventListener('dragover', (e) => {
+            const container = e.target.closest('[id^="nodes-container-"]');
+            if (container && draggedNode) {
+                e.preventDefault(); // allow drop
+                const afterElement = getDragAfterElement(container, e.clientX, e.clientY);
+                if (afterElement == null) {
+                    container.appendChild(draggedNode);
+                } else {
+                    container.insertBefore(draggedNode, afterElement);
+                }
+                const groupId = container.id.replace('nodes-container-', '');
+                draggedNode.dataset.groupId = groupId;
+            }
+        });
+
+        function getDragAfterElement(container, x, y) {
+            const draggableElements = [...container.querySelectorAll('.node-card:not(.opacity-40)')];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const dx = x - (box.left + box.width / 2);
+                const dy = y - (box.top + box.height / 2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < closest.offset) {
+                    return { offset: distance, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.POSITIVE_INFINITY }).element;
+        }
+
+        function saveNodeOrders() {
+            const updates = [];
+            document.querySelectorAll('[id^="nodes-container-"]').forEach(container => {
+                const groupId = parseInt(container.id.replace('nodes-container-', ''), 10);
+                container.querySelectorAll('.node-card').forEach(card => {
+                    updates.push({
+                        id: parseInt(card.dataset.id, 10),
+                        group_id: groupId
+                    });
+                });
+            });
+
+            fetch('/nodes/reorder', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates)
+            }).then(res => {
+                if (!res.ok) {
+                    console.error('Failed to save node order updates');
+                }
+            });
+        }
+    </script>
+    {{end}}
+    <div id="modal-container"></div>
+</body>
+</html>
